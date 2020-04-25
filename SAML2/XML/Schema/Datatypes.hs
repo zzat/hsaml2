@@ -72,13 +72,14 @@ xpDuration = XP.xpWrapEither
     _ -> c x s
 
 -- |§3.2.7 theoretically allows timezones, but SAML2 does not use them
-type DateTime = Time.UTCTime
+-- type DateTime = Time.UTCTime
+type DateTime = String
 
 xpDateTime :: XP.PU DateTime
 xpDateTime = XP.PU
   { XP.theSchema = XPS.scDTxsd XSD.xsd_dateTime []
-  , XP.appPickle = XP.putCont . XN.mkText . tweakTimeString . formatTime defaultTimeLocale fmtz
-  , XP.appUnPickle = XP.getCont >>= XP.liftMaybe "dateTime expects text" . XN.getText >>= parseTimeM True defaultTimeLocale fmtz
+  , XP.appPickle = XP.putCont . XN.mkText -- . tweakTimeString . formatTime defaultTimeLocale fmtz
+  , XP.appUnPickle = XP.getCont >>= XP.liftMaybe "dateTime expects text" . XN.getText -- >>= parseTimeM True defaultTimeLocale fmtz
   }
   where
   -- timezone must be 'Z', and MicrosoftS(tm) Azure(tm) will choke when it is ommitted.  (error
