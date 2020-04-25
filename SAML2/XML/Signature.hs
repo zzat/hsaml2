@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE ViewPatterns #-}
 -- |
 -- XML Signature Syntax and Processing
@@ -35,6 +36,7 @@ import Network.URI (URI(..))
 import qualified Text.XML.HXT.Core as HXT
 import qualified Text.XML.HXT.DOM.ShowXml as DOM
 import qualified Text.XML.HXT.DOM.XmlNode as DOM
+import qualified Text.XML.HXT.DOM.QualifiedName as DOM
 
 import SAML2.XML
 import SAML2.XML.Canonical
@@ -104,6 +106,11 @@ data PublicKeys = PublicKeys
   , publicKeyRSA :: Maybe RSA.PublicKey
   } deriving (Eq, Show)
 
+#if MIN_VERSION_base(4,11,0)
+instance Semigroup PublicKeys where
+  PublicKeys dsa1 rsa1 <> PublicKeys dsa2 rsa2 =
+    PublicKeys (dsa1 <|> dsa2) (rsa1 <|> rsa2)
+#endif
 instance Monoid PublicKeys where
   mempty = PublicKeys Nothing Nothing
   PublicKeys dsa1 rsa1 `mappend` PublicKeys dsa2 rsa2 =
@@ -157,6 +164,8 @@ verifyBytes PublicKeys{ publicKeyDSA = Just k } (Identified SignatureDSA_SHA1) s
   where (r, s) = BS.splitAt 20 sig
 verifyBytes PublicKeys{ publicKeyRSA = Just k } (Identified SignatureRSA_SHA1) sig m = Just $
   RSA.verify (Just SHA1) k m sig
+verifyBytes PublicKeys{ publicKeyRSA = Just k } (Identified SignatureRSA_SHA256) sig m = Just $
+  RSA.verify (Just SHA256) k m sig
 verifyBytes _ _ _ _ = Nothing
 
 signBase64 :: SigningKey -> BS.ByteString -> IO BS.ByteString
@@ -184,7 +193,8 @@ generateSignature sk si = do
 -- Just True:        everything is ok!
 verifySignature :: PublicKeys -> String -> HXT.XmlTree -> IO (Maybe Bool)
 verifySignature pks xid doc = do
-  x <- case HXT.runLA (getID xid) doc of
+  let namespaces = DOM.toNsEnv $ HXT.runLA HXT.collectNamespaceDecl doc
+  x <- case HXT.runLA (getID xid HXT.>>> HXT.attachNsEnv namespaces) doc of
     [x] -> return x
     _ -> fail "verifySignature: element not found"
   sx <- case child "Signature" x of

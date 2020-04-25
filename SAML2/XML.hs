@@ -26,12 +26,15 @@ module SAML2.XML
   ) where
 
 import qualified Data.ByteString.Lazy as BSL
-import qualified Data.ByteString.Lazy.Char8 as BSLC
+import qualified Data.ByteString.Lazy.UTF8 as BSLU
 import Data.Default (Default(..))
 import qualified Data.Invertible as Inv
 import Data.Maybe (listToMaybe)
 import Network.URI (URI)
 import qualified Text.XML.HXT.Core as HXT
+import Text.XML.HXT.Arrow.Edit (escapeXmlRefs)
+import Text.XML.HXT.DOM.ShowXml (xshow')
+import Text.XML.HXT.DOM.XmlNode (getChildren)
 
 import SAML2.XML.Types
 import SAML2.Core.Datatypes
@@ -98,7 +101,7 @@ samlToDoc = head
   . XP.pickleDoc XP.xpickle
 
 docToXML :: HXT.XmlTree -> BSL.ByteString
-docToXML = BSL.concat . HXT.runLA (HXT.xshowBlob HXT.getChildren)
+docToXML = xshow' cquot aquot (:) . getChildren where (cquot, aquot) = escapeXmlRefs
 
 samlToXML :: XP.XmlPickler a => a -> BSL.ByteString
 samlToXML = docToXML . samlToDoc
@@ -109,7 +112,7 @@ xmlToDoc = listToMaybe . HXT.runLA
   HXT.>>> HXT.removeWhiteSpace
   HXT.>>> HXT.neg HXT.isXmlPi
   HXT.>>> HXT.propagateNamespaces)
-  . BSLC.unpack -- XXX encoding?
+  . BSLU.toString
 
 docToSAML :: XP.XmlPickler a => HXT.XmlTree -> Either String a
 docToSAML = XP.unpickleDoc' XP.xpickle
